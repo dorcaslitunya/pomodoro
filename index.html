@@ -783,10 +783,18 @@ function applyTemplate(){
   const wk=document.getElementById('week-select').value;
   const t=readCfgFromDOM();
   weekTemplates[wk]=JSON.parse(JSON.stringify(t));
-  // apply to every date in this week
+  console.log('=== applyTemplate ===');
+  console.log('week key:', wk);
+  console.log('template:', JSON.stringify(t));
+  console.log('dates in week:', (weekGroups[wk]||[]).map(d=>{
+    const key=ds(d);
+    const dow=dowName(key);
+    return key+' -> '+dow;
+  }));
   (weekGroups[wk]||[]).forEach(d=>{
     const key=ds(d);
     const day=dowName(key);
+    console.log('  applying', day, 'to', key, ':', t[day]);
     if(t[day]){
       t[day].forEach((type,i)=>{
         if(type && dayState[key] && dayState[key].pomos[i]){
@@ -796,7 +804,7 @@ function applyTemplate(){
     }
   });
   saveDayState();renderCalendar();updateStats();
-  flashConfirm('apply-btn','Applied!');
+  flashConfirm('apply-btn','Applied! (check console)');
 }
 
 function applyToAll(){
