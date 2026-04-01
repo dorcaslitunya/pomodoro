@@ -296,20 +296,40 @@ const TYPE_COLORS={feature:'var(--feature)',adhoc:'var(--adhoc)',meeting:'var(--
 const DEFTIMES=['08:30','09:30','10:30','13:00','14:00'];
 
 // ─── UTILS ───
-function ds(d){return d.toISOString().slice(0,10);}
+function ds(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function addMins(t,m){if(!t)return '';const[h,mn]=t.split(':').map(Number);const tot=h*60+mn+m;return String(Math.floor(tot/60)%24).padStart(2,'0')+':'+String(tot%60).padStart(2,'0');}
 function nowStr(){const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');}
 function today(){return ds(new Date());}
 
-// ─── DATE HELPERS ───
+// ─── DATE HELPERS — all local time, never toISOString() for keys ───
+// Format a Date as YYYY-MM-DD using local year/month/day (no UTC shift)
+function localDateKey(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+// Parse a YYYY-MM-DD key back to a local-noon Date (safe for getDay())
+function keyToDate(key){
+  const [y,m,d]=key.split('-').map(Number);
+  return new Date(y,m-1,d,12,0,0);
+}
+// Day-of-week name from a date key, entirely in local time
+function dowName(key){
+  return ['sun','mon','tue','wed','thu','fri','sat'][keyToDate(key).getDay()];
+}
 function buildDates(){
-  const s=new Date(2025,3,1),e=new Date(2025,5,30),a=[];
+  const s=new Date(2025,3,1,12,0,0),e=new Date(2025,5,30,12,0,0),a=[];
   let d=new Date(s);
   while(d<=e){if(d.getDay()>=1&&d.getDay()<=5)a.push(new Date(d));d.setDate(d.getDate()+1);}
   return a;
 }
-function wkKey(date){const d=new Date(date),day=d.getDay(),diff=d.getDate()-day+(day===0?-6:1);return new Date(d.setDate(diff)).toISOString().slice(0,10);}
+// Week key = localDateKey of Monday of that week
+function wkKey(date){
+  const d=new Date(date);
+  const day=d.getDay();
+  const diff=d.getDate()-day+(day===0?-6:1);
+  const mon=new Date(d.getFullYear(),d.getMonth(),diff,12,0,0);
+  return localDateKey(mon);
+}
 function gByWeek(dates){const w={};dates.forEach(d=>{const k=wkKey(d);if(!w[k])w[k]=[];w[k].push(new Date(d));});return w;}
 function gByMonth(dates){const m={};dates.forEach(d=>{const k=d.getFullYear()+'-'+d.getMonth();if(!m[k])m[k]=[];m[k].push(new Date(d));});return m;}
 
@@ -758,13 +778,6 @@ function readCfgFromDOM(){
   return result;
 }
 
-// Get day-of-week name from a datestring 'YYYY-MM-DD' safely (no timezone shift)
-function dowName(dateKey){
-  const parts=dateKey.split('-');
-  // create date at noon local time to avoid UTC rollover
-  const d=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]),12,0,0);
-  return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()];
-}
 
 function applyTemplate(){
   const wk=document.getElementById('week-select').value;
