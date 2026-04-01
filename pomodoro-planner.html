@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pomodoro Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&display=swap" rel="stylesheet">
+<style>
+:root{
+  --tomato:#D85A30;--tomato-l:#FAECE7;--tomato-d:#4A1B0C;
+  --feature:#185FA5;--feature-l:#E6F1FB;--feature-b:rgba(24,95,165,0.22);
+  --adhoc:#BA7517;--adhoc-l:#FAEEDA;--adhoc-b:rgba(186,117,23,0.22);
+  --meeting:#993556;--meeting-l:#FBEAF0;--meeting-b:rgba(153,53,86,0.22);
+  --pr:#3B6D11;--pr-l:#EAF3DE;--pr-b:rgba(59,109,17,0.22);
+  --office:#534AB7;--office-l:#EEEDFE;
+  --text:#2C2C2A;--muted:#888780;--border:rgba(0,0,0,0.1);
+  --bg:#FDFCF9;--surf:#FFFFFF;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Mono',monospace;background:var(--bg);color:var(--text);min-height:100vh;}
+h1{font-family:'Fraunces',serif;font-size:2rem;font-weight:300;letter-spacing:-0.02em;margin-bottom:0.2rem;}
+.sub{font-size:0.7rem;color:var(--muted);letter-spacing:0.05em;text-transform:uppercase;}
+
+/* ── TABS ── */
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 2rem;background:var(--surf);position:sticky;top:0;z-index:300;}
+.tab{font-family:'DM Mono',monospace;font-size:0.72rem;padding:12px 18px;border:none;background:none;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;transition:color 0.15s,border-color 0.15s;letter-spacing:0.04em;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--tomato);border-bottom-color:var(--tomato);}
+.tab-content{display:none;padding:1.5rem 2rem;}
+.tab-content.active{display:block;}
+
+/* ── TIMER DOCK ── */
+#timer-dock{
+  background:var(--surf);border:1px solid var(--border);border-radius:14px;
+  padding:14px 18px;margin-bottom:1.5rem;
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  transition:border-color 0.2s;
+}
+#timer-dock.running{border-color:var(--tomato);}
+.t-label{display:flex;flex-direction:column;gap:2px;flex:1;min-width:120px;}
+.t-what{font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;}
+.t-task{font-size:0.88rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;}
+.t-task.empty{color:var(--muted);font-weight:400;font-style:italic;font-size:0.78rem;}
+.t-time{font-family:'Fraunces',serif;font-weight:300;font-size:2.3rem;letter-spacing:-0.02em;min-width:100px;text-align:center;transition:color 0.3s;}
+.t-time.urgent{color:var(--tomato);}
+.t-bar-wrap{flex:1;min-width:60px;height:3px;background:var(--bg);border-radius:2px;overflow:hidden;}
+.t-bar{height:100%;background:var(--tomato);border-radius:2px;transition:width 0.9s linear;}
+.t-ctrls{display:flex;gap:7px;}
+.tb{font-family:'DM Mono',monospace;font-size:0.7rem;padding:7px 13px;border-radius:7px;border:1px solid var(--border);background:var(--surf);color:var(--text);cursor:pointer;transition:all 0.12s;}
+.tb:hover{background:var(--bg);}
+.tb.primary{background:var(--tomato);color:#fff;border-color:var(--tomato);}
+.tb.primary:hover{background:var(--tomato-d);}
+.tb:disabled{opacity:0.32;cursor:not-allowed;}
+.sound-ctrl{display:flex;align-items:center;gap:6px;font-size:0.65rem;color:var(--muted);}
+.sound-ctrl input[type=range]{width:56px;accent-color:var(--tomato);cursor:pointer;}
+.sound-test{font-family:'DM Mono',monospace;font-size:0.62rem;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;}
+.sound-test:hover{color:var(--tomato);border-color:var(--tomato);}
+
+/* ── LEGEND ── */
+.legend{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:1.25rem;align-items:center;}
+.ll{font-size:0.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-right:3px;}
+.li{display:flex;align-items:center;gap:5px;font-size:0.68rem;color:var(--muted);}
+.ld{width:10px;height:10px;border-radius:3px;}
+
+/* ── STATS ── */
+.stats-bar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:1.5rem;}
+.sc{background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:9px 13px;min-width:78px;}
+.sl{font-size:0.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px;}
+.sv{font-size:1.1rem;font-family:'Fraunces',serif;font-weight:300;}
+.ss{font-size:0.57rem;color:var(--muted);margin-top:2px;}
+
+/* ── CONFIG ── */
+.cpanel{background:var(--surf);border:1px solid var(--border);border-radius:12px;padding:1.1rem;margin-bottom:1.5rem;}
+.cpanel h2{font-family:'Fraunces',serif;font-weight:300;font-size:0.9rem;margin-bottom:0.8rem;color:var(--muted);}
+.cgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:0.6rem;}
+.dc{display:flex;flex-direction:column;gap:3px;}
+.dc label{font-size:0.64rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;}
+.dc select{font-family:'DM Mono',monospace;font-size:0.68rem;padding:4px 18px 4px 6px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='5'%3E%3Cpath d='M0 0l4.5 5 4.5-5z' fill='%23888'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 5px center;}
+.wsel{font-family:'DM Mono',monospace;font-size:0.7rem;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer;}
+.btn{font-family:'DM Mono',monospace;font-size:0.7rem;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surf);color:var(--text);cursor:pointer;transition:background 0.12s;}
+.btn:hover{background:var(--bg);}
+.btn-r{background:var(--tomato);color:#fff;border-color:var(--tomato);}
+.btn-r:hover{background:var(--tomato-d);}
+
+/* ── CALENDAR ── */
+.msect{margin-bottom:2rem;}
+.mtitle{font-family:'Fraunces',serif;font-weight:300;font-size:1.2rem;margin-bottom:0.8rem;border-bottom:1px solid var(--border);padding-bottom:0.35rem;}
+.wrow{display:grid;grid-template-columns:72px repeat(5,1fr);gap:5px;margin-bottom:5px;align-items:start;}
+.wlbl{font-size:0.6rem;color:var(--muted);padding-top:7px;letter-spacing:0.04em;}
+.dcell{background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:5px;min-height:80px;}
+.dcell.off{border-color:var(--office);border-width:1.5px;background:var(--office-l);}
+.dhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.dname{font-size:0.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;}
+.dnum{font-size:0.7rem;font-weight:500;}
+.obadge{font-size:0.5rem;padding:1px 4px;background:var(--office);color:#fff;border-radius:3px;cursor:pointer;}
+.pstack{display:flex;flex-direction:column;gap:2px;}
+.pb{border-radius:4px;padding:3px 5px;font-size:0.58rem;display:flex;align-items:flex-start;justify-content:space-between;gap:3px;cursor:pointer;user-select:none;position:relative;min-height:24px;transition:filter 0.1s;}
+.pb:hover{filter:brightness(0.92);}
+.pb.active-t{outline:2px solid var(--tomato);outline-offset:1px;}
+.pff{background:var(--feature-l);color:var(--feature);border:1px solid var(--feature-b);}
+.pfa{background:var(--adhoc-l);color:var(--adhoc);border:1px solid var(--adhoc-b);}
+.pfm{background:var(--meeting-l);color:var(--meeting);border:1px solid var(--meeting-b);}
+.pfp{background:var(--pr-l);color:var(--pr);border:1px solid var(--pr-b);}
+.pb-done{opacity:0.45;text-decoration:line-through;}
+.pl{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0;}
+.ptype{font-size:0.54rem;opacity:0.65;}
+.ptask{font-size:0.6rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pslot{font-size:0.53rem;opacity:0.5;margin-top:1px;}
+.pr2{display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0;}
+.pdur{font-size:0.51rem;opacity:0.5;}
+.pedit{font-size:0.56rem;opacity:0;color:inherit;}
+.pb:hover .pedit{opacity:0.55;}
+.play-btn{position:absolute;right:3px;bottom:3px;background:var(--tomato);color:#fff;border:none;border-radius:3px;font-size:0.52rem;padding:1px 5px;cursor:pointer;opacity:0;font-family:'DM Mono',monospace;z-index:2;}
+.pb:hover .play-btn,.pb.active-t .play-btn{opacity:1;}
+
+/* ── MODAL ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;z-index:600;opacity:0;pointer-events:none;transition:opacity 0.15s;}
+.overlay.open{opacity:1;pointer-events:all;}
+.modal{background:var(--surf);border-radius:14px;border:1px solid var(--border);padding:1.4rem;width:400px;max-width:93vw;transform:translateY(10px);transition:transform 0.15s;box-shadow:0 12px 40px rgba(0,0,0,0.11);}
+.overlay.open .modal{transform:translateY(0);}
+.mhead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;}
+.mtit{font-family:'Fraunces',serif;font-weight:300;font-size:1rem;}
+.mdate{font-size:0.63rem;color:var(--muted);margin-top:3px;}
+.mclose{background:none;border:none;font-size:1rem;cursor:pointer;color:var(--muted);padding:2px 5px;border-radius:4px;}
+.mclose:hover{color:var(--text);background:var(--bg);}
+.mf{margin-bottom:0.85rem;}
+.mf label{display:block;font-size:0.63rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;}
+.mf input,.mf textarea,.mf select{width:100%;font-family:'DM Mono',monospace;font-size:0.76rem;padding:7px 9px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);outline:none;transition:border-color 0.14s;}
+.mf input:focus,.mf textarea:focus{border-color:var(--tomato);}
+.mf textarea{resize:vertical;min-height:52px;line-height:1.5;}
+.time-row{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.tpicker{display:flex;gap:5px;flex-wrap:wrap;}
+.tbtn{font-family:'DM Mono',monospace;font-size:0.65rem;padding:4px 9px;border-radius:5px;border:1px solid var(--border);cursor:pointer;background:var(--bg);color:var(--muted);transition:all 0.11s;}
+.tbtn.af{background:var(--feature-l);color:var(--feature);border-color:var(--feature-b);}
+.tbtn.aa{background:var(--adhoc-l);color:var(--adhoc);border-color:var(--adhoc-b);}
+.tbtn.am{background:var(--meeting-l);color:var(--meeting);border-color:var(--meeting-b);}
+.macts{display:flex;gap:7px;justify-content:space-between;align-items:center;margin-top:1rem;}
+
+/* ── HISTORY TAB ── */
+.hist-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;gap:10px;}
+.hist-header h2{font-family:'Fraunces',serif;font-weight:300;font-size:1.3rem;}
+.hist-stats{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:1.5rem;}
+.hsc{background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:9px 13px;min-width:90px;}
+.streak-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1.5rem;}
+.streak-day{width:28px;height:28px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:0.55rem;font-weight:500;cursor:default;border:1px solid var(--border);}
+.streak-day.hit{background:var(--tomato);color:#fff;border-color:var(--tomato);}
+.streak-day.partial{background:var(--tomato-l);color:var(--tomato);border-color:rgba(216,90,48,0.25);}
+.streak-day.none{background:var(--bg);color:var(--muted);}
+.streak-day.future{background:var(--bg);color:var(--border);border-color:var(--border);}
+.log-section{margin-bottom:1.75rem;}
+.log-section h3{font-family:'Fraunces',serif;font-weight:300;font-size:1rem;margin-bottom:0.75rem;color:var(--muted);}
+.log-entry{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.log-entry:last-child{border-bottom:none;}
+.log-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+.log-main{flex:1;}
+.log-task{font-size:0.78rem;font-weight:500;}
+.log-meta{font-size:0.63rem;color:var(--muted);margin-top:2px;}
+.log-dur{font-size:0.7rem;color:var(--muted);font-family:'Fraunces',serif;flex-shrink:0;}
+.week-hist{margin-bottom:1.25rem;}
+.week-hist-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;}
+.week-hist-label{font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;}
+.week-hist-bar{display:flex;gap:3px;align-items:flex-end;height:40px;}
+.day-bar-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;}
+.day-bar{width:100%;background:var(--tomato);border-radius:2px;min-height:2px;transition:height 0.3s;}
+.day-bar-lbl{font-size:0.5rem;color:var(--muted);}
+.empty-hist{font-size:0.78rem;color:var(--muted);font-style:italic;padding:1.5rem 0;}
+.clear-hist{font-size:0.65rem;color:var(--muted);cursor:pointer;padding:4px 8px;border:1px solid var(--border);border-radius:5px;background:none;font-family:'DM Mono',monospace;}
+.clear-hist:hover{color:var(--tomato);border-color:var(--tomato);}
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div style="padding:1.5rem 2rem 0.75rem;">
+  <h1>Pomodoro Planner</h1>
+  <p class="sub">April — June 2025 &nbsp;·&nbsp; 50 min focus · 30 min PR review &nbsp;·&nbsp; <span style="color:var(--tomato)">●</span> auto-saved</p>
+</div>
+
+<div class="tab-bar">
+  <button class="tab active" onclick="switchTab('planner')">Planner</button>
+  <button class="tab" onclick="switchTab('history')">History</button>
+</div>
+
+<!-- PLANNER TAB -->
+<div class="tab-content active" id="tab-planner">
+
+  <!-- TIMER DOCK -->
+  <div id="timer-dock">
+    <div class="t-label">
+      <span class="t-what" id="t-what">no active pomodoro</span>
+      <span class="t-task empty" id="t-task">hover any pomodoro and click ▶</span>
+    </div>
+    <div class="t-time" id="t-display">—:——</div>
+    <div class="t-bar-wrap"><div class="t-bar" id="t-bar" style="width:100%"></div></div>
+    <div class="t-ctrls">
+      <button class="tb primary" id="t-play" onclick="timerToggle()" disabled>▶ Start</button>
+      <button class="tb" id="t-reset" onclick="timerReset()" disabled>↺</button>
+      <button class="tb" id="t-skip" onclick="timerSkip()" disabled>Skip</button>
+    </div>
+    <div class="sound-ctrl">
+      <span>🔔</span>
+      <input type="range" id="vol-slider" min="0" max="100" value="80" title="Volume" oninput="setVolume(this.value)"/>
+      <button class="sound-test" onclick="playDone(true)" title="Preview done sound">test</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="ll">Key:</span>
+    <span class="li"><span class="ld" style="background:var(--feature)"></span>feature</span>
+    <span class="li"><span class="ld" style="background:var(--adhoc)"></span>ad-hoc</span>
+    <span class="li"><span class="ld" style="background:var(--meeting)"></span>meeting</span>
+    <span class="li"><span class="ld" style="background:var(--pr)"></span>PR review (30m)</span>
+    <span class="li"><span class="ld" style="background:var(--office)"></span>office day (3 pomos)</span>
+  </div>
+
+  <div class="stats-bar" id="stats-bar"></div>
+
+  <div class="cpanel">
+    <h2>Weekly template editor</h2>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:9px;flex-wrap:wrap;">
+      <label style="font-size:0.68rem;color:var(--muted);">Week:</label>
+      <select class="wsel" id="week-select"></select>
+      <button class="btn btn-r" onclick="applyTemplate()">Apply to week</button>
+      <button class="btn" onclick="applyToAll()">Apply to all</button>
+      <button class="btn" onclick="resetAll()">Reset all</button>
+    </div>
+    <div class="cgrid" id="config-grid"></div>
+    <div style="font-size:0.63rem;color:var(--muted);">Click pomodoro to edit · right-click to cycle type · hover for ▶</div>
+  </div>
+
+  <div id="calendar"></div>
+</div>
+
+<!-- HISTORY TAB -->
+<div class="tab-content" id="tab-history">
+  <div class="hist-header">
+    <h2>History</h2>
+    <button class="clear-hist" onclick="clearHistory()">Clear history</button>
+  </div>
+  <div class="hist-stats" id="hist-stats"></div>
+  <div style="margin-bottom:1rem;">
+    <div style="font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Streak — last 30 days</div>
+    <div class="streak-row" id="streak-row"></div>
+  </div>
+  <div style="margin-bottom:1.25rem;">
+    <div style="font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Daily pomodoros — last 8 weeks</div>
+    <div class="week-hist-bar" id="weekly-bar"></div>
+  </div>
+  <div id="hist-log"></div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="overlay" id="overlay" onclick="onOvClick(event)">
+  <div class="modal">
+    <div class="mhead">
+      <div><div class="mtit" id="m-title">Edit pomodoro</div><div class="mdate" id="m-date"></div></div>
+      <button class="mclose" onclick="closeModal()">✕</button>
+    </div>
+    <div class="mf" id="mf-type">
+      <label>Type</label>
+      <div class="tpicker">
+        <button class="tbtn" data-type="feature" onclick="setMType('feature')">Feature work</button>
+        <button class="tbtn" data-type="adhoc" onclick="setMType('adhoc')">Ad-hoc</button>
+        <button class="tbtn" data-type="meeting" onclick="setMType('meeting')">Meeting</button>
+      </div>
+    </div>
+    <div class="mf">
+      <label>Task / allocation</label>
+      <input type="text" id="m-task" placeholder="e.g. Auth refactor, Sprint planning…" maxlength="80"/>
+    </div>
+    <div class="mf">
+      <div class="time-row">
+        <div><label>Start time</label><input type="time" id="m-start" value="09:00"/></div>
+        <div><label>End time <span style="opacity:0.45;font-size:0.56rem;">(auto)</span></label><input type="time" id="m-end" readonly style="opacity:0.55;"/></div>
+      </div>
+    </div>
+    <div class="mf"><label>Notes</label><textarea id="m-notes" placeholder="Links, context, blockers…"></textarea></div>
+    <div class="macts">
+      <button class="btn btn-r" onclick="saveAndStart()">▶ Save &amp; Start</button>
+      <div style="display:flex;gap:7px;">
+        <button class="btn" onclick="clearMFields()">Clear</button>
+        <button class="btn btn-r" onclick="saveModal()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONSTANTS ───
+const DAYS=['Mon','Tue','Wed','Thu','Fri'];
+const PTYPES=['feature','adhoc','meeting'];
+const PLABELS={feature:'Feature',adhoc:'Ad-hoc',meeting:'Meeting',pr:'PR review'};
+const PDUR={feature:50,adhoc:50,meeting:50,pr:30};
+const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const TYPE_COLORS={feature:'var(--feature)',adhoc:'var(--adhoc)',meeting:'var(--meeting)',pr:'var(--pr)'};
+const DEFTIMES=['08:30','09:30','10:30','13:00','14:00'];
+
+// ─── UTILS ───
+function ds(d){return d.toISOString().slice(0,10);}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function addMins(t,m){if(!t)return '';const[h,mn]=t.split(':').map(Number);const tot=h*60+mn+m;return String(Math.floor(tot/60)%24).padStart(2,'0')+':'+String(tot%60).padStart(2,'0');}
+function nowStr(){const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');}
+function today(){return ds(new Date());}
+
+// ─── DATE HELPERS ───
+function buildDates(){
+  const s=new Date(2025,3,1),e=new Date(2025,5,30),a=[];
+  let d=new Date(s);
+  while(d<=e){if(d.getDay()>=1&&d.getDay()<=5)a.push(new Date(d));d.setDate(d.getDate()+1);}
+  return a;
+}
+function wkKey(date){const d=new Date(date),day=d.getDay(),diff=d.getDate()-day+(day===0?-6:1);return new Date(d.setDate(diff)).toISOString().slice(0,10);}
+function gByWeek(dates){const w={};dates.forEach(d=>{const k=wkKey(d);if(!w[k])w[k]=[];w[k].push(new Date(d));});return w;}
+function gByMonth(dates){const m={};dates.forEach(d=>{const k=d.getFullYear()+'-'+d.getMonth();if(!m[k])m[k]=[];m[k].push(new Date(d));});return m;}
+
+const allDates=buildDates();
+const weekGroups=gByWeek(allDates);
+const weekKeys=Object.keys(weekGroups).sort();
+
+// ─── STATE + LOCALSTORAGE ───
+const LS_DAY='pomo_daystate';
+const LS_HIST='pomo_history';
+const LS_TIMER='pomo_timer';
+
+function defaultDayState(d){
+  const key=ds(d);
+  return {
+    pomos:[
+      {type:'feature',task:'',notes:'',start:DEFTIMES[0],end:addMins(DEFTIMES[0],50),done:false},
+      {type:'feature',task:'',notes:'',start:DEFTIMES[1],end:addMins(DEFTIMES[1],50),done:false},
+      {type:'feature',task:'',notes:'',start:DEFTIMES[2],end:addMins(DEFTIMES[2],50),done:false},
+      {type:'feature',task:'',notes:'',start:DEFTIMES[3],end:addMins(DEFTIMES[3],50),done:false},
+      {type:'adhoc',  task:'',notes:'',start:DEFTIMES[4],end:addMins(DEFTIMES[4],50),done:false}
+    ],
+    pr:{task:'',notes:'',start:'15:00',end:'15:30',done:false},
+    isOffice:false
+  };
+}
+
+let dayState={};
+function loadDayState(){
+  try{const s=localStorage.getItem(LS_DAY);if(s)dayState=JSON.parse(s);}catch(e){}
+  allDates.forEach(d=>{
+    const key=ds(d);
+    if(!dayState[key])dayState[key]=defaultDayState(d);
+    // ensure done fields exist for old saves
+    dayState[key].pomos.forEach(p=>{if(p.done===undefined)p.done=false;});
+    if(dayState[key].pr.done===undefined)dayState[key].pr.done=false;
+  });
+}
+function saveDayState(){try{localStorage.setItem(LS_DAY,JSON.stringify(dayState));}catch(e){}}
+
+// history: array of {id, date, type, task, notes, startedAt, completedAt, durationSecs, plannedMins}
+let history=[];
+function loadHistory(){try{const s=localStorage.getItem(LS_HIST);if(s)history=JSON.parse(s);}catch(e){}}
+function saveHistory(){try{localStorage.setItem(LS_HIST,JSON.stringify(history));}catch(e){}}
+
+// ─── TIMER ───
+const timer={
+  ds:null,idx:null,isPR:false,
+  totalSecs:0,remainSecs:0,
+  running:false,_iv:null,
+  label:'',type:'feature',
+  startedAt:null, elapsedSecs:0
+};
+
+function loadPomoIntoTimer(key,idx,isPR){
+  // stop any running timer first without clearing state lose
+  if(timer._iv){clearInterval(timer._iv);timer._iv=null;}
+  timer.running=false;
+  const s=dayState[key];
+  const p=isPR?s.pr:s.pomos[idx];
+  const dur=(isPR?30:50)*60;
+  timer.ds=key; timer.idx=idx; timer.isPR=isPR;
+  timer.totalSecs=dur; timer.remainSecs=dur;
+  timer.elapsedSecs=0; timer.startedAt=null;
+  timer.label=p.task||(isPR?'PR review':PLABELS[p.type]+' '+(idx+1));
+  timer.type=isPR?'pr':p.type;
+  updateTimerUI();
+}
+
+function timerToggle(){
+  if(!timer.ds)return;
+  if(timer.running){
+    // PAUSE
+    clearInterval(timer._iv);
+    timer._iv=null;
+    timer.running=false;
+    if(timer.startedAt){
+      timer.elapsedSecs+=Math.floor((Date.now()-timer.startedAt)/1000);
+      timer.startedAt=null;
+    }
+    document.getElementById('t-play').textContent='▶ Resume';
+    document.getElementById('timer-dock').classList.remove('running');
+  } else {
+    // PLAY
+    playStart();
+    timer.running=true;
+    timer.startedAt=Date.now();
+    document.getElementById('t-play').textContent='⏸ Pause';
+    document.getElementById('timer-dock').classList.add('running');
+    timer._iv=setInterval(()=>{
+      timer.remainSecs--;
+      if(timer.remainSecs<=0){
+        timer.remainSecs=0;
+        clearInterval(timer._iv);timer._iv=null;
+        timer.running=false;
+        timer.elapsedSecs+=Math.floor((Date.now()-timer.startedAt)/1000);
+        timer.startedAt=null;
+        document.getElementById('t-play').textContent='▶ Start';
+        document.getElementById('timer-dock').classList.remove('running');
+        onTimerComplete();
+      }
+      updateTimerUI();
+    },1000);
+  }
+  updateTimerUI();
+  renderCalendar();
+}
+
+function timerReset(){
+  if(timer._iv){clearInterval(timer._iv);timer._iv=null;}
+  timer.running=false;timer.startedAt=null;timer.elapsedSecs=0;
+  timer.remainSecs=timer.totalSecs;
+  document.getElementById('t-play').textContent='▶ Start';
+  document.getElementById('timer-dock').classList.remove('running');
+  updateTimerUI();renderCalendar();
+}
+
+function timerSkip(){
+  if(timer._iv){clearInterval(timer._iv);timer._iv=null;}
+  if(timer.startedAt){timer.elapsedSecs+=Math.floor((Date.now()-timer.startedAt)/1000);timer.startedAt=null;}
+  timer.running=false;timer.remainSecs=0;
+  document.getElementById('t-play').textContent='▶ Start';
+  document.getElementById('timer-dock').classList.remove('running');
+  onTimerComplete();
+  updateTimerUI();renderCalendar();
+}
+
+function onTimerComplete(){
+  // mark done
+  if(timer.ds){
+    const s=dayState[timer.ds];
+    if(timer.isPR)s.pr.done=true;
+    else if(timer.idx!==null)s.pomos[timer.idx].done=true;
+    saveDayState();
+  }
+  // log to history
+  const p=timer.isPR?dayState[timer.ds].pr:dayState[timer.ds].pomos[timer.idx];
+  history.unshift({
+    id:Date.now(),
+    date:timer.ds,
+    type:timer.type,
+    task:p.task||timer.label,
+    notes:p.notes||'',
+    completedAt:new Date().toISOString(),
+    durationSecs:timer.totalSecs-timer.remainSecs+timer.elapsedSecs,
+    plannedMins:timer.isPR?30:50
+  });
+  saveHistory();
+  playDone();
+  notify('Pomodoro done 🍅',timer.label+' complete!');
+  renderCalendar();
+  if(document.getElementById('tab-history').classList.contains('active'))renderHistory();
+}
+
+function updateTimerUI(){
+  const {remainSecs,totalSecs,label,type,ds:key,running}=timer;
+  const m=Math.floor(remainSecs/60),s=remainSecs%60;
+  document.getElementById('t-display').textContent=key?(m+':'+(String(s).padStart(2,'0'))):'—:——';
+  document.getElementById('t-display').className='t-time'+(remainSecs<=60&&key?' urgent':'');
+  const pct=totalSecs>0?remainSecs/totalSecs:1;
+  document.getElementById('t-bar').style.width=(pct*100)+'%';
+  const tlbl=timer.isPR?'PR review':PLABELS[type]||'Pomodoro';
+  document.getElementById('t-what').textContent=key?tlbl:'no active pomodoro';
+  const tel=document.getElementById('t-task');
+  if(key){tel.textContent=label;tel.className='t-task';}
+  else{tel.textContent='hover any pomodoro and click ▶';tel.className='t-task empty';}
+  const dis=!key;
+  document.getElementById('t-play').disabled=dis;
+  document.getElementById('t-reset').disabled=dis;
+  document.getElementById('t-skip').disabled=dis;
+  if(key&&!running&&remainSecs===totalSecs)document.getElementById('t-play').textContent='▶ Start';
+}
+
+function startPomo(key,idx,isPR,e){
+  e.stopPropagation();
+  loadPomoIntoTimer(key,idx,isPR);
+  timerToggle();
+  document.getElementById('timer-dock').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function notify(title,body){
+  document.title='✅ '+title+' — Planner';
+  setTimeout(()=>document.title='Pomodoro Planner',5000);
+  if('Notification' in window&&Notification.permission==='granted'){
+    try{new Notification(title,{body});}catch(e){}
+  }
+}
+
+// ─── AUDIO ENGINE ───
+let audioCtx=null;
+let masterVol=0.8;
+
+function getCtx(){
+  if(!audioCtx){
+    try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}
+  }
+  // resume if suspended (browser autoplay policy)
+  if(audioCtx.state==='suspended')audioCtx.resume();
+  return audioCtx;
+}
+
+function setVolume(v){masterVol=v/100;}
+
+// play a single sine tone: freq Hz, start sec, dur sec, peak gain, type
+function tone(ctx,freq,startT,dur,gain,type='sine'){
+  const osc=ctx.createOscillator();
+  const env=ctx.createGain();
+  osc.connect(env);env.connect(ctx.destination);
+  osc.type=type;osc.frequency.setValueAtTime(freq,startT);
+  env.gain.setValueAtTime(0,startT);
+  env.gain.linearRampToValueAtTime(gain*masterVol,startT+0.012);
+  env.gain.exponentialRampToValueAtTime(0.0001,startT+dur);
+  osc.start(startT);osc.stop(startT+dur+0.05);
+}
+
+// satisfying 3-note ascending "done" melody: C5 → E5 → G5 with a warm overtone
+function playDone(preview=false){
+  const ctx=getCtx();if(!ctx)return;
+  const t=ctx.currentTime+(preview?0.05:0.05);
+  // main notes
+  tone(ctx,523.25,t,      0.55,0.38,'sine');   // C5
+  tone(ctx,659.25,t+0.18, 0.55,0.38,'sine');   // E5
+  tone(ctx,783.99,t+0.36, 0.75,0.42,'sine');   // G5
+  // warm harmonic shimmer on each note (triangle, quieter)
+  tone(ctx,523.25,t,      0.45,0.10,'triangle');
+  tone(ctx,659.25,t+0.18, 0.45,0.10,'triangle');
+  tone(ctx,783.99,t+0.36, 0.65,0.14,'triangle');
+  // subtle sub octave on final note for weight
+  tone(ctx,391.99,t+0.36, 0.70,0.08,'sine');
+}
+
+// short upward two-note "start" ping: E5 → G5, crisp
+function playStart(){
+  const ctx=getCtx();if(!ctx)return;
+  const t=ctx.currentTime+0.05;
+  tone(ctx,659.25,t,      0.25,0.22,'sine');
+  tone(ctx,783.99,t+0.13, 0.30,0.22,'sine');
+  tone(ctx,659.25,t,      0.22,0.06,'triangle');
+  tone(ctx,783.99,t+0.13, 0.28,0.06,'triangle');
+}
+
+// ─── MODAL ───
+let mDs=null,mIdx=null,mIsPR=false;
+
+function openModal(key,idx,isPR){
+  mDs=key;mIdx=idx;mIsPR=isPR;
+  const s=dayState[key];
+  const d=new Date(key+'T12:00:00');
+  document.getElementById('m-date').textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const tf=document.getElementById('mf-type');
+  if(isPR){
+    document.getElementById('m-title').textContent='PR review · 30m';
+    tf.style.display='none';
+    document.getElementById('m-task').value=s.pr.task||'';
+    document.getElementById('m-start').value=s.pr.start||'15:00';
+    document.getElementById('m-notes').value=s.pr.notes||'';
+    updateEndTime(30);
+  } else {
+    const p=s.pomos[idx];
+    document.getElementById('m-title').textContent='Pomodoro '+(idx+1)+' · 50m';
+    tf.style.display='block';
+    setMType(p.type,false);
+    document.getElementById('m-task').value=p.task||'';
+    document.getElementById('m-start').value=p.start||DEFTIMES[idx]||'09:00';
+    document.getElementById('m-notes').value=p.notes||'';
+    updateEndTime(50);
+  }
+  document.getElementById('overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('m-task').focus(),130);
+}
+
+document.getElementById('m-start').addEventListener('input',()=>updateEndTime(mIsPR?30:50));
+
+function updateEndTime(dur){
+  const s=document.getElementById('m-start').value;
+  document.getElementById('m-end').value=s?addMins(s,dur):'';
+}
+
+function setMType(type,save=true){
+  document.querySelectorAll('.tbtn').forEach(b=>b.className='tbtn'+(b.dataset.type===type?' a'+type.charAt(0):''));
+  if(save&&mDs!==null&&mIdx!==null&&!mIsPR)dayState[mDs].pomos[mIdx].type=type;
+}
+function getMType(){const a=document.querySelector('.tbtn[class*=" a"]');return a?a.dataset.type:'feature';}
+
+function saveModal(andStart=false){
+  if(mDs===null)return;
+  const s=dayState[mDs];
+  const task=document.getElementById('m-task').value.trim();
+  const notes=document.getElementById('m-notes').value.trim();
+  const start=document.getElementById('m-start').value;
+  const end=document.getElementById('m-end').value;
+  if(mIsPR){s.pr.task=task;s.pr.notes=notes;s.pr.start=start;s.pr.end=end;}
+  else{s.pomos[mIdx].type=getMType();s.pomos[mIdx].task=task;s.pomos[mIdx].notes=notes;s.pomos[mIdx].start=start;s.pomos[mIdx].end=end;}
+  saveDayState();
+  const captureDs=mDs,captureIdx=mIdx,captureIsPR=mIsPR;
+  closeModal();
+  renderCalendar();updateStats();
+  if(andStart){loadPomoIntoTimer(captureDs,captureIdx,captureIsPR);timerToggle();}
+}
+function saveAndStart(){saveModal(true);}
+function clearMFields(){document.getElementById('m-task').value='';document.getElementById('m-notes').value='';}
+function closeModal(){document.getElementById('overlay').classList.remove('open');mDs=null;mIdx=null;mIsPR=false;}
+function onOvClick(e){if(e.target===document.getElementById('overlay'))closeModal();}
+
+function cycleType(key,idx,e){
+  e.preventDefault();e.stopPropagation();
+  const p=dayState[key].pomos[idx];
+  const nx={feature:'adhoc',adhoc:'meeting',meeting:'feature'};
+  p.type=nx[p.type];
+  saveDayState();renderCalendar();updateStats();
+}
+function toggleOffice(key,e){
+  e.stopPropagation();
+  dayState[key].isOffice=!dayState[key].isOffice;
+  saveDayState();renderCalendar();updateStats();
+}
+
+// ─── RENDER CALENDAR ───
+function isActive(key,idx,isPR){
+  return timer.ds===key&&timer.idx===idx&&timer.isPR===isPR&&(timer.running||timer.remainSecs<timer.totalSecs&&timer.remainSecs>0);
+}
+
+function renderPomos(key){
+  const s=dayState[key];
+  const pomos=s.isOffice?s.pomos.slice(0,3):s.pomos;
+  let h='<div class="pstack">';
+  pomos.forEach((p,i)=>{
+    const act=isActive(key,i,false);
+    const ht=p.task&&p.task.length>0;
+    const cls=`pb p${p.type==='feature'?'ff':p.type==='adhoc'?'fa':p.type==='meeting'?'fm':'ff'}${act?' active-t':''}${p.done?' pb-done':''}`;
+    const playLabel=act&&timer.running?'⏸':'▶';
+    h+=`<div class="${cls}" onclick="openModal('${key}',${i},false)" oncontextmenu="cycleType('${key}',${i},event)">
+      <div class="pl">
+        <span class="ptype">${PLABELS[p.type]}</span>
+        ${ht?`<span class="ptask">${esc(p.task)}</span>`:''}
+        ${p.start?`<span class="pslot">${p.start}–${p.end}</span>`:''}
+      </div>
+      <div class="pr2"><span class="pdur">50m</span><span class="pedit">✎</span></div>
+      <button class="play-btn" onclick="startPomo('${key}',${i},false,event)">${playLabel}</button>
+    </div>`;
+  });
+  const pract=isActive(key,null,true);
+  const prplay=pract&&timer.running?'⏸':'▶';
+  const pt=s.pr&&s.pr.task;
+  h+=`<div class="pb pfp${pract?' active-t':''}${s.pr.done?' pb-done':''}" onclick="openModal('${key}',null,true)">
+    <div class="pl">
+      <span class="ptype">PR review</span>
+      ${pt?`<span class="ptask">${esc(s.pr.task)}</span>`:''}
+      ${s.pr.start?`<span class="pslot">${s.pr.start}–${s.pr.end}</span>`:''}
+    </div>
+    <div class="pr2"><span class="pdur">30m</span><span class="pedit">✎</span></div>
+    <button class="play-btn" onclick="startPomo('${key}',null,true,event)">${prplay}</button>
+  </div>`;
+  h+='</div>';
+  return h;
+}
+
+function renderCalendar(){
+  const months=gByMonth(allDates);
+  let h='';
+  Object.keys(months).sort().forEach(mk=>{
+    const md=months[mk];
+    const mname=MN[md[0].getMonth()]+' '+md[0].getFullYear();
+    h+=`<div class="msect"><div class="mtitle">${mname}</div>`;
+    const mw=gByWeek(md);
+    Object.keys(mw).sort().forEach(wk=>{
+      const wn=weekKeys.indexOf(wk)+1;
+      h+=`<div class="wrow"><div class="wlbl">W${wn}<br>${new Date(wk+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div>`;
+      const bd={};mw[wk].forEach(d=>{bd[d.getDay()]=d;});
+      for(let dow=1;dow<=5;dow++){
+        const d=bd[dow];
+        if(!d){h+=`<div class="dcell" style="opacity:0.14;min-height:60px;"></div>`;continue;}
+        const key=ds(d);const s=dayState[key];
+        h+=`<div class="dcell${s.isOffice?' off':''}">
+          <div class="dhead">
+            <span class="dname">${DAYS[dow-1]}</span>
+            <div style="display:flex;align-items:center;gap:3px;">
+              ${s.isOffice?`<span class="obadge" onclick="toggleOffice('${key}',event)">office</span>`:`<span style="font-size:0.5rem;color:var(--office);cursor:pointer;opacity:0.38;" onclick="toggleOffice('${key}',event)">+off</span>`}
+              <span class="dnum">${d.getDate()}</span>
+            </div>
+          </div>
+          ${renderPomos(key)}
+        </div>`;
+      }
+      h+=`</div>`;
+    });
+    h+=`</div>`;
+  });
+  document.getElementById('calendar').innerHTML=h;
+}
+
+// ─── STATS ───
+function updateStats(){
+  let tF=0,tA=0,tM=0,tPR=0,tOff=0,tMins=0,alloc=0;
+  allDates.forEach(d=>{
+    const key=ds(d);const s=dayState[key];
+    if(s.isOffice)tOff++;
+    const pomos=s.isOffice?s.pomos.slice(0,3):s.pomos;
+    pomos.forEach(p=>{
+      if(p.type==='feature'){tF++;tMins+=50;}
+      if(p.type==='adhoc'){tA++;tMins+=50;}
+      if(p.type==='meeting'){tM++;tMins+=50;}
+      if(p.task)alloc++;
+    });
+    tPR++;tMins+=30;
+    if(s.pr&&s.pr.task)alloc++;
+  });
+  const hrs=Math.round(tMins/60);
+  document.getElementById('stats-bar').innerHTML=`
+    <div class="sc"><div class="sl">Focus hrs</div><div class="sv">${hrs}h</div><div class="ss">3 months</div></div>
+    <div class="sc"><div class="sl">Feature</div><div class="sv">${tF}</div><div class="ss">${Math.round(tF*50/60)}h</div></div>
+    <div class="sc"><div class="sl">Ad-hoc</div><div class="sv">${tA}</div><div class="ss">${Math.round(tA*50/60)}h</div></div>
+    <div class="sc"><div class="sl">Meetings</div><div class="sv">${tM}</div><div class="ss">${Math.round(tM*50/60)}h</div></div>
+    <div class="sc"><div class="sl">PR reviews</div><div class="sv">${tPR}</div><div class="ss">${Math.round(tPR*30/60)}h</div></div>
+    <div class="sc"><div class="sl">Allocated</div><div class="sv">${alloc}</div><div class="ss">tasks set</div></div>
+    <div class="sc"><div class="sl">Office days</div><div class="sv">${tOff}</div></div>
+  `;
+}
+
+// ─── TEMPLATE ───
+const weekTemplates={};
+weekKeys.forEach(k=>{weekTemplates[k]={mon:['feature','feature','feature','feature','adhoc'],tue:['feature','feature','feature','feature','adhoc'],wed:['feature','feature','feature','feature','adhoc'],thu:['feature','feature','feature','feature','adhoc'],fri:['feature','feature','feature','feature','adhoc']};});
+
+function buildWeekSel(){
+  document.getElementById('week-select').innerHTML=weekKeys.map((k,i)=>{
+    const d=new Date(k+'T12:00:00');
+    return `<option value="${k}">W${i+1}: ${d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</option>`;
+  }).join('');
+}
+function buildCfg(wkKey){
+  const t=weekTemplates[wkKey],dn=['mon','tue','wed','thu','fri'];
+  document.getElementById('config-grid').innerHTML=dn.map(day=>{
+    const lbl=day.charAt(0).toUpperCase()+day.slice(1);
+    return `<div class="dc"><label>${lbl}</label>${[0,1,2,3,4].map(i=>`<select onchange="updateTmpl('${wkKey}','${day}',${i},this.value)">${PTYPES.map(tp=>`<option value="${tp}" ${t[day][i]===tp?'selected':''}>${PLABELS[tp]}</option>`).join('')}</select>`).join('')}</div>`;
+  }).join('');
+}
+function updateTmpl(wk,day,idx,val){weekTemplates[wk][day][idx]=val;}
+function applyTemplate(){
+  const wk=document.getElementById('week-select').value,t=weekTemplates[wk],dn=['mon','tue','wed','thu','fri'];
+  weekGroups[wk].forEach(d=>{const key=ds(d);const day=dn[d.getDay()-1];t[day].forEach((type,i)=>{dayState[key].pomos[i].type=type;});});
+  saveDayState();renderCalendar();updateStats();
+}
+function applyToAll(){
+  const wk=document.getElementById('week-select').value,t=weekTemplates[wk],dn=['mon','tue','wed','thu','fri'];
+  weekKeys.forEach(owk=>{weekTemplates[owk]=JSON.parse(JSON.stringify(t));weekGroups[owk].forEach(d=>{const key=ds(d);const day=dn[d.getDay()-1];t[day].forEach((type,i)=>{dayState[key].pomos[i].type=type;});});});
+  saveDayState();renderCalendar();updateStats();
+}
+function resetAll(){
+  allDates.forEach(d=>{const key=ds(d);dayState[key]=defaultDayState(d);});
+  saveDayState();renderCalendar();updateStats();
+}
+
+// ─── HISTORY TAB ───
+function renderHistory(){
+  if(!history.length){
+    document.getElementById('hist-stats').innerHTML='';
+    document.getElementById('streak-row').innerHTML='';
+    document.getElementById('weekly-bar').innerHTML='';
+    document.getElementById('hist-log').innerHTML='<div class="empty-hist">No completed pomodoros yet. Start a timer to record your first session.</div>';
+    return;
+  }
+
+  // summary stats
+  const totalPomos=history.length;
+  const totalMins=Math.round(history.reduce((a,h)=>a+(h.durationSecs||0),0)/60);
+  const uniqueDays=new Set(history.map(h=>h.date)).size;
+  const byType={feature:0,adhoc:0,meeting:0,pr:0};
+  history.forEach(h=>{if(byType[h.type]!==undefined)byType[h.type]++;});
+  document.getElementById('hist-stats').innerHTML=`
+    <div class="hsc"><div class="sl">Completed</div><div class="sv">${totalPomos}</div><div class="ss">pomodoros</div></div>
+    <div class="hsc"><div class="sl">Focus time</div><div class="sv">${totalMins}m</div><div class="ss">${Math.round(totalMins/60)}h total</div></div>
+    <div class="hsc"><div class="sl">Active days</div><div class="sv">${uniqueDays}</div></div>
+    <div class="hsc"><div class="sl">Feature</div><div class="sv">${byType.feature}</div></div>
+    <div class="hsc"><div class="sl">Ad-hoc</div><div class="sv">${byType.adhoc}</div></div>
+    <div class="hsc"><div class="sl">Meetings</div><div class="sv">${byType.meeting}</div></div>
+    <div class="hsc"><div class="sl">PR reviews</div><div class="sv">${byType.pr}</div></div>
+  `;
+
+  // streak — last 30 days
+  const streak=[];
+  const now=new Date();
+  for(let i=29;i>=0;i--){
+    const dd=new Date(now);dd.setDate(dd.getDate()-i);
+    const key=ds(dd);
+    const dow=dd.getDay();
+    const isWeekend=dow===0||dow===6;
+    const count=history.filter(h=>h.date===key).length;
+    const target=5;
+    let cls='none';
+    if(isWeekend)cls='future';
+    else if(count>=target)cls='hit';
+    else if(count>0)cls='partial';
+    streak.push(`<div class="streak-day ${cls}" title="${key}: ${count} pomodoros">${dd.getDate()}</div>`);
+  }
+  document.getElementById('streak-row').innerHTML=streak.join('');
+
+  // weekly bar — last 8 weeks
+  const weekBuckets=[];
+  for(let w=7;w>=0;w--){
+    const wstart=new Date(now);wstart.setDate(wstart.getDate()-wstart.getDay()-w*7+1);
+    const wend=new Date(wstart);wend.setDate(wend.getDate()+4);
+    const label=wstart.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    const cnt=history.filter(h=>{const hd=new Date(h.date);return hd>=wstart&&hd<=wend;}).length;
+    weekBuckets.push({label,cnt});
+  }
+  const maxCnt=Math.max(...weekBuckets.map(b=>b.cnt),1);
+  document.getElementById('weekly-bar').innerHTML=weekBuckets.map(b=>`
+    <div class="day-bar-wrap">
+      <div style="font-size:0.52rem;color:var(--muted);margin-bottom:2px;">${b.cnt||''}</div>
+      <div style="width:100%;background:var(--tomato);border-radius:2px;height:${Math.max(3,Math.round(b.cnt/maxCnt*38))}px;"></div>
+      <div class="day-bar-lbl">${b.label}</div>
+    </div>`).join('');
+
+  // daily log grouped by date
+  const byDate={};
+  history.forEach(h=>{if(!byDate[h.date])byDate[h.date]=[];byDate[h.date].push(h);});
+  const sortedDates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+  let logHtml='';
+  sortedDates.forEach(dateKey=>{
+    const entries=byDate[dateKey];
+    const d=new Date(dateKey+'T12:00:00');
+    const dlabel=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    const dayMins=Math.round(entries.reduce((a,e)=>a+(e.durationSecs||0),0)/60);
+    logHtml+=`<div class="log-section">
+      <h3>${dlabel} <span style="font-size:0.7rem;font-family:'DM Mono';color:var(--muted);font-style:normal;">· ${entries.length} pomodoros · ${dayMins}m</span></h3>`;
+    entries.forEach(e=>{
+      const completed=new Date(e.completedAt);
+      const timeStr=completed.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+      const durMins=Math.round((e.durationSecs||0)/60);
+      logHtml+=`<div class="log-entry">
+        <div class="log-dot" style="background:${TYPE_COLORS[e.type]||'var(--muted)'}"></div>
+        <div class="log-main">
+          <div class="log-task">${esc(e.task)||PLABELS[e.type]}</div>
+          <div class="log-meta">${PLABELS[e.type]} · completed at ${timeStr}${e.notes?` · ${esc(e.notes)}`:''}</div>
+        </div>
+        <div class="log-dur">${durMins}m</div>
+      </div>`;
+    });
+    logHtml+=`</div>`;
+  });
+  document.getElementById('hist-log').innerHTML=logHtml;
+}
+
+function clearHistory(){
+  if(!confirm('Clear all history? This cannot be undone.'))return;
+  history=[];saveHistory();renderHistory();
+}
+
+// ─── TABS ───
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    const names=['planner','history'];
+    t.classList.toggle('active',names[i]===name);
+  });
+  document.querySelectorAll('.tab-content').forEach(c=>{
+    c.classList.toggle('active',c.id==='tab-'+name);
+  });
+  if(name==='history')renderHistory();
+}
+
+// ─── KEYBOARD ───
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeModal();
+  if(e.key==='Enter'&&document.getElementById('overlay').classList.contains('open')&&e.target.tagName!=='TEXTAREA'){saveModal();return;}
+  if(e.key===' '&&!document.getElementById('overlay').classList.contains('open')){e.preventDefault();if(timer.ds)timerToggle();}
+});
+
+document.getElementById('week-select').addEventListener('change',function(){buildCfg(this.value);});
+
+// ─── INIT ───
+if('Notification' in window&&Notification.permission==='default')Notification.requestPermission();
+loadDayState();
+loadHistory();
+buildWeekSel();
+buildCfg(weekKeys[0]);
+renderCalendar();
+updateStats();
+updateTimerUI();
+</script>
+</body>
+</html>
