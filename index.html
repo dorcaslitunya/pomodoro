@@ -220,8 +220,8 @@ h1{font-family:'Fraunces',serif;font-size:2rem;font-weight:300;letter-spacing:-0
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:9px;flex-wrap:wrap;">
       <label style="font-size:0.68rem;color:var(--muted);">Week:</label>
       <select class="wsel" id="week-select"></select>
-      <button class="btn btn-r" onclick="applyTemplate()">Apply to week</button>
-      <button class="btn" onclick="applyToAll()">Apply to all</button>
+      <button class="btn btn-r" id="apply-btn" onclick="applyTemplate()">Apply to week</button>
+      <button class="btn" id="apply-all-btn" onclick="applyToAll()">Apply to all</button>
       <button class="btn" onclick="resetAll()">Reset all</button>
     </div>
     <div class="cgrid" id="config-grid"></div>
@@ -741,50 +741,81 @@ function buildWeekSel(){
 }
 function buildCfg(wkKey){
   const t=weekTemplates[wkKey],dn=['mon','tue','wed','thu','fri'];
-  document.getElementById('config-grid').innerHTML=dn.map((day,di)=>{
+  document.getElementById('config-grid').innerHTML=dn.map((day)=>{
     const lbl=day.charAt(0).toUpperCase()+day.slice(1);
     return `<div class="dc"><label>${lbl}</label>${[0,1,2,3,4].map(i=>`<select data-day="${day}" data-idx="${i}">${PTYPES.map(tp=>`<option value="${tp}" ${t[day][i]===tp?'selected':''}>${PLABELS[tp]}</option>`).join('')}</select>`).join('')}</div>`;
   }).join('');
 }
+
+// Read template directly from the visible selects — no stale state
 function readCfgFromDOM(){
-  // read the current state of all selects in the config grid
-  const dn=['mon','tue','wed','thu','fri'];
-  const result={};
-  dn.forEach(day=>{result[day]=[null,null,null,null,null];});
+  const result={mon:[],tue:[],wed:[],thu:[],fri:[]};
   document.querySelectorAll('#config-grid select').forEach(sel=>{
-    const day=sel.dataset.day,idx=parseInt(sel.dataset.idx);
-    if(day&&result[day])result[day][idx]=sel.value;
+    const day=sel.dataset.day;
+    const idx=parseInt(sel.dataset.idx);
+    if(day && result[day]) result[day][idx]=sel.value;
   });
   return result;
 }
+
+// Get day-of-week name from a datestring 'YYYY-MM-DD' safely (no timezone shift)
+function dowName(dateKey){
+  const parts=dateKey.split('-');
+  // create date at noon local time to avoid UTC rollover
+  const d=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]),12,0,0);
+  return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()];
+}
+
 function applyTemplate(){
   const wk=document.getElementById('week-select').value;
   const t=readCfgFromDOM();
-  weekTemplates[wk]=t;
-  const dn=['mon','tue','wed','thu','fri'];
-  weekGroups[wk].forEach(d=>{
+  weekTemplates[wk]=JSON.parse(JSON.stringify(t));
+  // apply to every date in this week
+  (weekGroups[wk]||[]).forEach(d=>{
     const key=ds(d);
-    const day=dn[d.getDay()-1];
-    t[day].forEach((type,i)=>{if(type)dayState[key].pomos[i].type=type;});
+    const day=dowName(key);
+    if(t[day]){
+      t[day].forEach((type,i)=>{
+        if(type && dayState[key] && dayState[key].pomos[i]){
+          dayState[key].pomos[i].type=type;
+        }
+      });
+    }
   });
   saveDayState();renderCalendar();updateStats();
+  flashConfirm('apply-btn','Applied!');
 }
+
 function applyToAll(){
   const t=readCfgFromDOM();
-  const dn=['mon','tue','wed','thu','fri'];
-  weekKeys.forEach(owk=>{
-    weekTemplates[owk]=JSON.parse(JSON.stringify(t));
-    weekGroups[owk].forEach(d=>{
-      const key=ds(d);
-      const day=dn[d.getDay()-1];
-      t[day].forEach((type,i)=>{if(type)dayState[key].pomos[i].type=type;});
-    });
+  allDates.forEach(d=>{
+    const key=ds(d);
+    const day=dowName(key);
+    if(t[day]){
+      t[day].forEach((type,i)=>{
+        if(type && dayState[key] && dayState[key].pomos[i]){
+          dayState[key].pomos[i].type=type;
+        }
+      });
+    }
   });
+  weekKeys.forEach(owk=>{weekTemplates[owk]=JSON.parse(JSON.stringify(t));});
   saveDayState();renderCalendar();updateStats();
+  flashConfirm('apply-all-btn','Applied to all!');
 }
+
 function resetAll(){
   allDates.forEach(d=>{const key=ds(d);dayState[key]=defaultDayState(d);});
   saveDayState();renderCalendar();updateStats();
+}
+
+function flashConfirm(id,msg){
+  const el=document.getElementById(id);
+  if(!el)return;
+  const orig=el.textContent;
+  el.textContent=msg;
+  el.style.background='var(--pr)';
+  setTimeout(()=>{el.textContent=orig;el.style.background='';},1800);
 }
 
 // ─── HISTORY TAB ───
