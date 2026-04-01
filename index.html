@@ -741,20 +741,45 @@ function buildWeekSel(){
 }
 function buildCfg(wkKey){
   const t=weekTemplates[wkKey],dn=['mon','tue','wed','thu','fri'];
-  document.getElementById('config-grid').innerHTML=dn.map(day=>{
+  document.getElementById('config-grid').innerHTML=dn.map((day,di)=>{
     const lbl=day.charAt(0).toUpperCase()+day.slice(1);
-    return `<div class="dc"><label>${lbl}</label>${[0,1,2,3,4].map(i=>`<select onchange="updateTmpl('${wkKey}','${day}',${i},this.value)">${PTYPES.map(tp=>`<option value="${tp}" ${t[day][i]===tp?'selected':''}>${PLABELS[tp]}</option>`).join('')}</select>`).join('')}</div>`;
+    return `<div class="dc"><label>${lbl}</label>${[0,1,2,3,4].map(i=>`<select data-day="${day}" data-idx="${i}">${PTYPES.map(tp=>`<option value="${tp}" ${t[day][i]===tp?'selected':''}>${PLABELS[tp]}</option>`).join('')}</select>`).join('')}</div>`;
   }).join('');
 }
-function updateTmpl(wk,day,idx,val){weekTemplates[wk][day][idx]=val;}
+function readCfgFromDOM(){
+  // read the current state of all selects in the config grid
+  const dn=['mon','tue','wed','thu','fri'];
+  const result={};
+  dn.forEach(day=>{result[day]=[null,null,null,null,null];});
+  document.querySelectorAll('#config-grid select').forEach(sel=>{
+    const day=sel.dataset.day,idx=parseInt(sel.dataset.idx);
+    if(day&&result[day])result[day][idx]=sel.value;
+  });
+  return result;
+}
 function applyTemplate(){
-  const wk=document.getElementById('week-select').value,t=weekTemplates[wk],dn=['mon','tue','wed','thu','fri'];
-  weekGroups[wk].forEach(d=>{const key=ds(d);const day=dn[d.getDay()-1];t[day].forEach((type,i)=>{dayState[key].pomos[i].type=type;});});
+  const wk=document.getElementById('week-select').value;
+  const t=readCfgFromDOM();
+  weekTemplates[wk]=t;
+  const dn=['mon','tue','wed','thu','fri'];
+  weekGroups[wk].forEach(d=>{
+    const key=ds(d);
+    const day=dn[d.getDay()-1];
+    t[day].forEach((type,i)=>{if(type)dayState[key].pomos[i].type=type;});
+  });
   saveDayState();renderCalendar();updateStats();
 }
 function applyToAll(){
-  const wk=document.getElementById('week-select').value,t=weekTemplates[wk],dn=['mon','tue','wed','thu','fri'];
-  weekKeys.forEach(owk=>{weekTemplates[owk]=JSON.parse(JSON.stringify(t));weekGroups[owk].forEach(d=>{const key=ds(d);const day=dn[d.getDay()-1];t[day].forEach((type,i)=>{dayState[key].pomos[i].type=type;});});});
+  const t=readCfgFromDOM();
+  const dn=['mon','tue','wed','thu','fri'];
+  weekKeys.forEach(owk=>{
+    weekTemplates[owk]=JSON.parse(JSON.stringify(t));
+    weekGroups[owk].forEach(d=>{
+      const key=ds(d);
+      const day=dn[d.getDay()-1];
+      t[day].forEach((type,i)=>{if(type)dayState[key].pomos[i].type=type;});
+    });
+  });
   saveDayState();renderCalendar();updateStats();
 }
 function resetAll(){
